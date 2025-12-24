@@ -26,12 +26,42 @@ def load_model():
 
 def get_places_by_category(model, category_keyword):
     df, _ = model
-    category_keyword = category_keyword.lower()
+    
+    # 1. Bersihkan keyword dan pecah menjadi kata-kata (tokens)
+    #    Misal: "jakarta pantai indah" -> ["jakarta", "pantai", "indah"]
+    tokens = category_keyword.lower().split()
+    
+    if not tokens:
+        return []
 
-    filtered = df[
-        df['Place_Name'].str.lower().str.contains(category_keyword) |
-        df['Category'].str.lower().str.contains(category_keyword)
-    ]
+    # 2. Buat kolom temporary untuk pencarian gabungan (Name + City + Category)
+    #    Kita gunakan lowercase untuk pencarian case-insensitive
+    #    Kita lakukan ini pada copy dataframe atau langsung pada series boolean
+    
+    # Logic: Row terpilih jika SEMUA token ada di dalam gabungan string data row tersebut.
+    # Contoh: Row "Pantai Indah Kapuk", City="Jakarta", Category="Bahari"
+    # Combined: "pantai indah kapuk bahari jakarta"
+    # Token "jakarta" -> Ada
+    # Token "pantai" -> Ada
+    # Token "indah" -> Ada
+    # Match!
+    
+    # Vectorized check:
+    # Kita buat series gabungan string lower
+    searchable_text = (
+        df['Place_Name'].fillna('') + ' ' + 
+        df['Category'].fillna('') + ' ' + 
+        df['City'].fillna('')
+    ).str.lower()
+    
+    # Mulai dengan semua True
+    mask = pd.Series([True] * len(df))
+    
+    # Filter iteratif per token
+    for token in tokens:
+        mask = mask & searchable_text.str.contains(token)
+        
+    filtered = df[mask]
 
     return sorted(filtered['Place_Name'].unique().tolist())
 
